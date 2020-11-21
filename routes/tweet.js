@@ -5,6 +5,8 @@ const multer = require('multer');
 var upload = multer({ dest: __dirname + '/public/uploads/' });
 var type = upload.single('audio_file.mp3');
 const fs = require('fs');
+const { promisify } = require('util')
+const fspromises = require('fs').promises;
 
 
 var tweet_route = express.Router();
@@ -61,7 +63,7 @@ tweet_route.route('/speechtotext')
 
     .post(type, (req, res, next) => {
         console.log('okay')
-        console.log('The file is ', req.file);
+        //console.log('The file is ', req.file);
 
         const { IamAuthenticator } = require('ibm-watson/auth');
         const SpeechToTextV1 = require('ibm-watson/speech-to-text/v1');
@@ -70,32 +72,162 @@ tweet_route.route('/speechtotext')
             authenticator: new IamAuthenticator({ apikey: 'i0xHingmfg8GUXQpu5uGl1zeWglHzmonnOsro4DqN5r6' }),
             serviceUrl: 'https://api.us-south.speech-to-text.watson.cloud.ibm.com/instances/998ca5f9-e981-4dc5-8faa-6841e8a63dae'
         });
-        console.log('the audio file is downlaoded');
 
-        /*   const params = {
-              // From file
-  
-              audio: 'D:/node_projects/twitter-test-server/audio.wav',
-              contentType: 'audio/mp3'
-          }; */
+        /* fs.createReadStream(req.file.path)
+            .pipe(speechToText.recognizeUsingWebSocket({ contentType: 'audio/mp3' }))
+            .pipe(fs.createWriteStream('./transcription.txt')) */
 
-
-        /* fs.createReadStream('../twitter-test-server/audio.wav') */
+        let writer = fs.createWriteStream('./transcription.txt');
         fs.createReadStream(req.file.path)
             .pipe(speechToText.recognizeUsingWebSocket({ contentType: 'audio/mp3' }))
-            .pipe(fs.createWriteStream('./transcription.txt'));
+            .pipe(writer)
 
-        /*         speechToText.recognize(params)
-                    .then(response => {
-                        console.log(JSON.stringify(response.result, null, 2));
-        
+        writer.on('close', function cb() {
+            fs.readFile('./transcription.txt', 'utf-8', (err, data) => {
+                if (err) throw err;
+                else {
+                    const dataSend = data;
+                    console.log(dataSend);
+                    res.statusCode = 200;
+                    res.json({
+                        data: dataSend
                     })
-        
-                    .catch(err => {
-                        console.log(err);
-                    }); */
+                    funcAfter()
+                }
+            })
+        })
+        function funcAfter() {
+            
+        }
 
+        /* const data = promisify(fs.readFile('./transcription.txt')); */
+        /*       const data = async () => {
+                  fs.readFile('./transcription.txt')
+              }
+              if (data.toString.length) {
+                  console.log(data);
+              }
+              else {
+                  const result = async () => {
+                      const print = await data
+                      return print;
+                  }
+                  console.log(result)
+              } */
+
+
+        /* async function readtest() {
+            try {
+                const data = await fs.readFile('transcription.txt')
+            }
+            /* catch ((error) => {
+                console.log("Error: " + err.message)
+            })    
+        } */
+
+        /* const data = readtest();
+        console.log(data); */
     })
+
+
+/*       const check = promisify(fs.readFile('./transcription.txt', 'utf-8'))
+      function getStuff() {
+          return check();
+      }
+      getStuff().then(data => console.log(data));
+ 
+      res.statusCode = 200;
+      res.send = 'Response is sent';
+      console.log(res); */
+
+/*         const writeFile = () => {
+            new Promise((resolve, reject) => {
+                fs.createReadStream(req.file.path)
+                    .pipe(speechToText.recognizeUsingWebSocket({ contentType: 'audio/mp3' }))
+                    .pipe(fs.createWriteStream('./transcription.txt'), (err, data) => {
+                        if (err) reject(err)
+                        else {
+                            resolve(data)
+                            console.log(data)
+                        }
+                    })
+            })
+        } */
+/*         const readFile = (path, opts = 'utf-8') => {
+            new Promise((resolve, reject) => {
+                fs.readFile(path, opts, (err, data) => {
+                    if (err) reject(err)
+                    else resolve(data)
+                })
+            })
+        } */
+/*       const run = async () => {
+          const res = await writeFile('./transcription.txt')
+           console.log(res) 
+      }
+      run(); */
+
+/*         const params = {
+            // From file
+            audio: req.file.path,
+            contentType: 'audio/mp3'
+        };
+        speechToText.recognize(params)
+            .then(response => {
+                console.log(JSON.stringify(response.result, null, 2));
+            })
+ 
+            .catch(err => {
+                console.log(err);
+            }); */
+
+
+/* fs.createReadStream('../twitter-test-server/audio.wav') */
+
+/*   fs.createReadStream(req.file.path)
+      .pipe(speechToText.recognizeUsingWebSocket({ contentType: 'audio/mp3' }))
+      .pipe(fs.createWriteStream('./transcription.txt'))
+   */
+/* const writeFileAsync = promisify(fs.createReadStream(req.file.path)
+    .pipe(speechToText.recognizeUsingWebSocket({ contentType: 'audio/mp3' }))
+    .pipe(fs.createWriteStream('./transcription.txt'))) */
+
+/*    const run = async () => {
+       const res1 = await writeFileAsync();
+       console.log(res1);
+   }
+   run() */
+
+/*         async function readcontent() {
+            const complete = await fs.createReadStream(req.file.path)
+                .pipe(speechToText.recognizeUsingWebSocket({ contentType: 'audio/mp3' }))
+                .pipe(fs.createWriteStream('./transcription.txt'))
+ 
+            if (complete) {
+                fs.readFile('transcription.txt', 'utf-8', function (err, buf) {
+                    if (err) {
+                        throw err;
+                    }
+                    console.log(buf);
+                })
+            }
+        } */
+
+
+
+/*         fs.readFile('transcription.txt', 'utf-8', function (err, buf) {
+            if (err) {
+                throw err;
+            }
+            const content = buf;
+            processFile(content)
+        })
+ 
+        function processFile(content) {
+            console.log('Content is', content);
+        } */
+
+
 
 /* tweet_route.route('/speechtotext')
     .post((req, res, next) => {
@@ -171,5 +303,6 @@ nlu.analyze(
     .catch(err => {
       console.log('error: ', err);
     }); */
+
 
 module.exports = tweet_route
