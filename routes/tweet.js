@@ -7,8 +7,13 @@ var type = upload.single('audio_file.mp3');
 const fs = require('fs');
 const { promisify } = require('util')
 const fspromises = require('fs').promises;
+var ProWritingAidApi = require('pro_writing_aid_api');
+const requestapi = require('request');
+const { checkServerIdentity } = require('tls');
 
 
+
+var defaultClient = ProWritingAidApi.ApiClient.instance;
 var tweet_route = express.Router();
 tweet_route.use(bodyParser.json())
 tweet_route.use(bodyParser.urlencoded({ extended: true }));
@@ -73,10 +78,6 @@ tweet_route.route('/speechtotext')
             serviceUrl: 'https://api.us-south.speech-to-text.watson.cloud.ibm.com/instances/998ca5f9-e981-4dc5-8faa-6841e8a63dae'
         });
 
-        /* fs.createReadStream(req.file.path)
-            .pipe(speechToText.recognizeUsingWebSocket({ contentType: 'audio/mp3' }))
-            .pipe(fs.createWriteStream('./transcription.txt')) */
-
         let writer = fs.createWriteStream('./transcription.txt');
         fs.createReadStream(req.file.path)
             .pipe(speechToText.recognizeUsingWebSocket({ contentType: 'audio/mp3' }))
@@ -92,12 +93,107 @@ tweet_route.route('/speechtotext')
                     res.json({
                         data: dataSend
                     })
-                    funcAfter()
+                    funcAfter(dataSend)
                 }
             })
         })
-        function funcAfter() {
-            
+        function funcAfter(dataSend) {
+            /* console.log('after the first call')
+            var api = new ProWritingAidApi.TextApi();
+            api.apiClient.basePath = "https://api.prowritingaid.com";
+            api.apiClient.defaultHeaders = { 'licenseCode': '4C913CB4-0CF6-440C-B663-AA07FAC07F71' }
+            var request = new ProWritingAidApi.TextAnalysisRequest(
+                'I did not jumped',
+                ['grammar'],
+            );
+            api.post(request)
+                .then(function (data) {
+                    console.log('API called successfully. Returned data: ');
+                    console.log(data);
+
+                }, function (error) {
+                    console.error(error);
+                }) */
+            console.log('The dataSend we are receiving is ', dataSend);
+            const options = {
+                method: 'POST',
+                url: 'https://textanalysis.p.rapidapi.com/spacy-noun-chunks-extraction',
+                headers: {
+                    'content-type': 'application/x-www-form-urlencoded',
+                    'x-rapidapi-key': '9358ebcda8msh8eea6d58e87dae9p1b9bb6jsn49421b7642a0',
+                    'x-rapidapi-host': 'textanalysis.p.rapidapi.com',
+                    useQueryString: true
+                },
+                form: { text: dataSend }
+            };
+
+            requestapi(options, function (error, response, body) {
+                if (error) throw new Error(error);
+
+                console.log('Results are', body);
+                const bodyR = JSON.parse(body);
+                console.log(bodyR.result)
+                grammarCheck(bodyR.result);
+
+            });
+
+            async function grammarCheck(bodyR) {
+                console.log('testing')
+                for (var i = 0; i < bodyR.length; i++) {
+                    var word = bodyR[i];
+                    if (word.length === 1) {
+                        continue;
+                    }
+                    console.log('The word to go into the func is', word)
+                    let res = await promiseReturn(word);
+                    console.log(`Words similar to ${word} are ${res}`);
+
+                }
+            }
+
+            function promiseReturn(word) {
+                const options = {
+                    method: 'GET',
+                    url: `https://api.datamuse.com/words?ml=${word}&max=5`,
+                };
+                return new Promise(function (resolve, reject) {
+                    requestapi(options, function (error, response, body) {
+
+                        /* if (error) throw new Error(error); */
+                        if (error) reject(error);
+
+                        console.log('Results are ', body)
+                        const useArray = eval(body)
+                        console.log(`Evaled body is ${word}`, useArray)
+
+                        var array = new Array();
+                        for (var j = 0; j <= 2; j++) {
+                            var object = useArray[j];
+                            //return object.word 
+                            array.push(object.word)
+                        }
+                        resolve(array)
+                        //console.log(`Words similar to ${word} are ${array}`)
+                    })
+                })
+            }
+            /* function suggest(word) {
+                const options = {
+                    method: 'GET',
+                    url: `https://api.datamuse.com/words?ml=${word}&max=3`,
+                };
+                requestapi(options, function (error, response, body) {
+                    if (error) throw new Error(error);
+
+                    console.log('Results are', body);
+
+                    for (var i = 0; i <= 2; i++) {
+                        console.log(body[i])
+                         var objectParse = JSON.parse(body[i]); 
+                          console.log('The word is ', objectParse.word) 
+                    }
+                });
+            } */
         }
 
         /* const data = promisify(fs.readFile('./transcription.txt')); */
@@ -127,6 +223,41 @@ tweet_route.route('/speechtotext')
 
         /* const data = readtest();
         console.log(data); */
+    })
+
+tweet_route.route('/tweetanalysis')
+    .post((req, res, next) => {
+
+        const NaturalLanguageUnderstandingV1 = require('ibm-watson/natural-language-understanding/v1');
+        const { IamAuthenticator } = require('ibm-watson/auth');
+
+        const nlu = new NaturalLanguageUnderstandingV1({
+            authenticator: new IamAuthenticator({ apikey: '75yxn4jmMfH9Qw2b7T1aZr-coNrNr-5ue6c6u8gFfy3T' }),
+            version: '2018-04-05',
+            serviceUrl: 'https://api.us-south.natural-language-understanding.watson.cloud.ibm.com/instances/3e457b95-b896-436d-8bc2-33fff7407782'
+        });
+
+        nlu.analyze(
+            {
+                text: 'I went to the beach today, and had a great time', // Buffer or String we will receive from the user in the back end once they compelte writing the tweet
+                features: {
+                    concepts: { limit: 3 },
+                    keywords: {
+                        sentiment: true,
+                        emotion: true
+                    },
+                    entities: {
+                        sentiment: true,
+                        limit: 2
+                    }
+                }
+            })
+            .then(response => {
+                console.log(JSON.stringify(response.result, null, 2));
+            })
+            .catch(err => {
+                console.log('error: ', err);
+            });
     })
 
 
